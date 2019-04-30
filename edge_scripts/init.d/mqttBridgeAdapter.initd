@@ -1,0 +1,54 @@
+#!/bin/bash
+set -e
+
+### BEGIN INIT INFO
+# Provides:           mqttBridgeAdapter
+# Required-Start:     edge
+# Required-Stop:      edge
+# Default-Start:      2 3 4 5
+# Default-Stop:       0 1 6
+# Short-Description:  ClearBlade MQTT Bridge Adapter
+### END INIT INFO
+
+. /etc/default/mqttBridgeAdapter
+. /etc/init.d/functions
+
+PATH=/usr/sbin:/usr/bin:/sbin:/bin
+
+
+FLAGS="-password=$ACTIVE_KEY -deviceName=$DEVICENAME -systemKey=$SYSTEM_KEY \
+-systemSecret=$SYSTEM_SECRET -platformURL=$PLATFORM_URL -messagingURL=$MESSAGING_URL \
+-adapterConfigCollectionID=$CONFIG_COLLECTION -logLevel=$LOG_LEVEL"
+
+start() {
+    echo "Starting mqttBridgeAdapter..."
+    start-stop-daemon --start --quiet --oknodo --background --pidfile $PIDFILE --make-pidfile --chdir ~ --exec /bin/bash -- -c "exec $DAEMON $FLAGS"
+}
+
+stop() {
+    echo "Stopping mqttBridgeAdapter..."
+    start-stop-daemon --stop --quiet --oknodo --pidfile $PIDFILE --retry 10
+}
+
+
+case "$1" in
+    start)
+        start
+        ;;
+
+    stop)
+        stop
+        ;;
+
+    restart)
+        stop
+        start
+        ;;
+
+    *)
+        echo "Usage: $0 {start|stop|restart}"
+        exit 1
+        ;;
+esac
+
+exit 0
