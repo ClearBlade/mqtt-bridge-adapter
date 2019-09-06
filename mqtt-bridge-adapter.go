@@ -3,10 +3,6 @@ package main
 import (
 	"encoding/json"
 	"flag"
-	cb "github.com/clearblade/Go-SDK"
-	mqttTypes "github.com/clearblade/mqtt_parsing"
-	mqtt "github.com/clearblade/paho.mqtt.golang"
-	"github.com/hashicorp/logutils"
 	"log"
 	"math/rand"
 	"os"
@@ -14,6 +10,11 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	cb "github.com/clearblade/Go-SDK"
+	mqttTypes "github.com/clearblade/mqtt_parsing"
+	mqtt "github.com/clearblade/paho.mqtt.golang"
+	"github.com/hashicorp/logutils"
 )
 
 var (
@@ -90,24 +91,19 @@ func main() {
 
 	rand.Seed(time.Now().UnixNano())
 
-	logfile, err := os.OpenFile("/var/log/mqttBridgeAdapter", os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
-	if err != nil {
-		log.Fatalf("Failed to open log file: %s", err.Error())
-	}
-
-	defer logfile.Close()
-
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 
 	filter := &logutils.LevelFilter{
 		Levels:   []logutils.LogLevel{"DEBUG", "INFO", "WARN", "ERROR", "FATAL"},
 		MinLevel: logutils.LogLevel(strings.ToUpper(logLevel)),
-		Writer:   logfile,
+		Writer:   os.Stdout,
 	}
 
 	log.SetOutput(filter)
 
 	cbClient = initCbClient()
+
+	var err error
 
 	for config.BrokerConfig.Client, err = initOtherMQTT(); err != nil; {
 		log.Println("[ERROR] Failed to initialize other MQTT client, trying again in 1 minute")
