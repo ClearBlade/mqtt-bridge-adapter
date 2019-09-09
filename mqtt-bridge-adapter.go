@@ -114,8 +114,6 @@ func main() {
 	for config.BrokerConfig.Client, err = initOtherMQTT(); err != nil; {
 		log.Println("[ERROR] Failed to initialize other MQTT client, trying again in 1 minute")
 		time.Sleep(time.Duration(time.Minute * 1))
-		// Uncomment the call below, to allow adapter_settings to be updated until user gets error with init
-		// setAdapterConfig(cbClient)
 		config.BrokerConfig.Client, err = initOtherMQTT()
 	}
 
