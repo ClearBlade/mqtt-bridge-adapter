@@ -215,42 +215,10 @@ func initCbClient() *cb.DeviceClient {
 	return client
 }
 
-func initOtherCbClient() error {
-	if config.BrokerConfig.PlatformURL == "" {
-		log.Fatalln("[FATAL] InitOtherCbClient PlatformURL is missing...")
-	}
-	return nil
-}
-
-func authenticateCbDevice() *cb.DeviceClient {
-	otherPlatformURL := config.BrokerConfig.PlatformURL
-	otherMessagingURL := config.BrokerConfig.MessagingURL
-	otherSysKey := config.BrokerConfig.SystemKey
-	otherSysSec := config.BrokerConfig.SystemSecret
-	otherDeviceName := config.BrokerConfig.DeviceName
-	otherActiveKey := config.BrokerConfig.ActiveKey
-
-	client := cb.NewDeviceClientWithAddrs(otherPlatformURL, otherMessagingURL, otherSysKey, otherSysSec, otherDeviceName, otherActiveKey)
-
-	log.Println("[INFO] initCbClient - Authenticating with ClearBlade")
-	for err := client.Authenticate(); err != nil; {
-		log.Printf("[ERROR] initCbClient - Error authenticating ClearBlade: %s\n", err.Error())
-		log.Println("[ERROR] initCbClient - Will retry in 1 minute...")
-		time.Sleep(time.Duration(time.Minute * 1))
-		err = client.Authenticate()
-	}
-	config.BrokerConfig.Username = client.DeviceToken
-	config.BrokerConfig.Password = otherSysKey
-
-	return client
-}
-
 func initOtherMQTT() (mqtt.Client, error) {
 	log.Println("[INFO] initOtherMQTT - Initializing Other MQTT")
-	//setAdapterConfig(otherCbClient)
 	if config.BrokerConfig.IsCbBroker {
 		initOtherCbClient()
-		authenticateCbDevice()
 	}
 
 	opts := mqtt.NewClientOptions()
@@ -278,6 +246,38 @@ func initOtherMQTT() (mqtt.Client, error) {
 	}
 	log.Println("[INFO] initOtherMQTT - Other MQTT Connected")
 	return client, nil
+}
+
+func initOtherCbClient() error {
+	if config.BrokerConfig.PlatformURL == "" {
+		log.Fatalln("[FATAL] InitOtherCbClient PlatformURL is missing...")
+	}
+	authenticateOtherCbDevice()
+	return nil
+}
+
+func authenticateOtherCbDevice() *cb.DeviceClient {
+	otherPlatformURL := config.BrokerConfig.PlatformURL
+	otherMessagingURL := config.BrokerConfig.MessagingURL
+	otherSysKey := config.BrokerConfig.SystemKey
+	otherSysSec := config.BrokerConfig.SystemSecret
+	otherDeviceName := config.BrokerConfig.DeviceName
+	otherActiveKey := config.BrokerConfig.ActiveKey
+
+	client := cb.NewDeviceClientWithAddrs(otherPlatformURL, otherMessagingURL, otherSysKey, otherSysSec, otherDeviceName, otherActiveKey)
+
+	log.Println("[INFO] initOtherCbClient - Authenticating with ClearBlade")
+	for err := client.Authenticate(); err != nil; {
+		log.Printf("[ERROR] initOtherCbClient - Error authenticating ClearBlade: %s\n", err.Error())
+		log.Println("[ERROR] initOtherCbClient - Will retry in 1 minute...")
+		time.Sleep(time.Duration(time.Minute * 1))
+		err = client.Authenticate()
+	}
+	// Set Auth username password for standard mqtt auth
+	config.BrokerConfig.Username = client.DeviceToken
+	config.BrokerConfig.Password = otherSysKey
+
+	return client
 }
 
 func setAdapterConfig(client cb.Client) {
