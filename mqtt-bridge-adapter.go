@@ -45,6 +45,12 @@ type mqttBroker struct {
 	Username     string   `json:"username"`
 	Password     string   `json:"password"`
 	Topics       []string `json:"topics"`
+	PlatformURL  string   `json:"platformURL"`
+	SystemKey    string   `json:"systemKey"`
+	SystemSecret string   `json:"systemSecret"`
+	DeviceName   string   `json:"deviceName"`
+	ActiveKey    string   `json:"activeKey"`
+	IsCbBroker   bool     `json:"isCbBroker"`
 	Client       mqtt.Client
 }
 
@@ -122,7 +128,7 @@ func main() {
 	log.Println("[INFO] Subscribing to outgoing clearblade topic")
 	var cbSubChannel <-chan *mqttTypes.Publish
 	for cbSubChannel, err = cbClient.Subscribe(config.TopicRoot+"/outgoing/#", qos); err != nil; {
-
+		cbSubChannel, err = cbClient.Subscribe(config.TopicRoot+"/outgoing/#", qos)
 	}
 	go cbMessageListener(cbSubChannel)
 
@@ -209,8 +215,43 @@ func initCbClient() *cb.DeviceClient {
 	return client
 }
 
+func initOtherCbClient() error {
+	if config.BrokerConfig.PlatformURL == "" {
+		log.Fatalln("[FATAL] InitOtherCbClient PlatformURL is missing...")
+	}
+	return nil
+}
+
+func authenticateCbDevice() *cb.DeviceClient {
+	otherPlatformURL := config.BrokerConfig.PlatformURL
+	otherMessagingURL := config.BrokerConfig.MessagingURL
+	otherSysKey := config.BrokerConfig.SystemKey
+	otherSysSec := config.BrokerConfig.SystemSecret
+	otherDeviceName := config.BrokerConfig.DeviceName
+	otherActiveKey := config.BrokerConfig.ActiveKey
+
+	client := cb.NewDeviceClientWithAddrs(otherPlatformURL, otherMessagingURL, otherSysKey, otherSysSec, otherDeviceName, otherActiveKey)
+
+	log.Println("[INFO] initCbClient - Authenticating with ClearBlade")
+	for err := client.Authenticate(); err != nil; {
+		log.Printf("[ERROR] initCbClient - Error authenticating ClearBlade: %s\n", err.Error())
+		log.Println("[ERROR] initCbClient - Will retry in 1 minute...")
+		time.Sleep(time.Duration(time.Minute * 1))
+		err = client.Authenticate()
+	}
+	config.BrokerConfig.Username = client.DeviceToken
+	config.BrokerConfig.Password = otherSysKey
+
+	return client
+}
+
 func initOtherMQTT() (mqtt.Client, error) {
 	log.Println("[INFO] initOtherMQTT - Initializing Other MQTT")
+	//setAdapterConfig(otherCbClient)
+	if config.BrokerConfig.IsCbBroker {
+		initOtherCbClient()
+		authenticateCbDevice()
+	}
 
 	opts := mqtt.NewClientOptions()
 
