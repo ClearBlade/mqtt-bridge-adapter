@@ -257,14 +257,12 @@ func initOtherCbClient() error {
 }
 
 func authenticateOtherCbDevice() *cb.DeviceClient {
-	otherPlatformURL := config.BrokerConfig.PlatformURL
-	otherMessagingURL := config.BrokerConfig.MessagingURL
-	otherSysKey := config.BrokerConfig.SystemKey
-	otherSysSec := config.BrokerConfig.SystemSecret
-	otherDeviceName := config.BrokerConfig.DeviceName
-	otherActiveKey := config.BrokerConfig.ActiveKey
-
-	client := cb.NewDeviceClientWithAddrs(otherPlatformURL, otherMessagingURL, otherSysKey, otherSysSec, otherDeviceName, otherActiveKey)
+	client := cb.NewDeviceClientWithAddrs(config.BrokerConfig.PlatformURL,
+		config.BrokerConfig.MessagingURL,
+		config.BrokerConfig.SystemKey,
+		config.BrokerConfig.SystemSecret,
+		config.BrokerConfig.DeviceName,
+		config.BrokerConfig.ActiveKey)
 
 	log.Println("[INFO] initOtherCbClient - Authenticating with ClearBlade")
 	for err := client.Authenticate(); err != nil; {
@@ -275,7 +273,7 @@ func authenticateOtherCbDevice() *cb.DeviceClient {
 	}
 	// Set Auth username password for standard mqtt auth
 	config.BrokerConfig.Username = client.DeviceToken
-	config.BrokerConfig.Password = otherSysKey
+	config.BrokerConfig.Password = config.BrokerConfig.SystemKey
 
 	return client
 }
