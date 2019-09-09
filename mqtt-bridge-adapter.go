@@ -128,7 +128,6 @@ func main() {
 	log.Println("[INFO] Subscribing to outgoing clearblade topic")
 	var cbSubChannel <-chan *mqttTypes.Publish
 	for cbSubChannel, err = cbClient.Subscribe(config.TopicRoot+"/outgoing/#", qos); err != nil; {
-		cbSubChannel, err = cbClient.Subscribe(config.TopicRoot+"/outgoing/#", qos)
 	}
 	go cbMessageListener(cbSubChannel)
 
@@ -248,15 +247,7 @@ func initOtherMQTT() (mqtt.Client, error) {
 	return client, nil
 }
 
-func initOtherCbClient() error {
-	if config.BrokerConfig.PlatformURL == "" {
-		log.Fatalln("[FATAL] InitOtherCbClient PlatformURL is missing...")
-	}
-	authenticateOtherCbDevice()
-	return nil
-}
-
-func authenticateOtherCbDevice() *cb.DeviceClient {
+func initOtherCbClient() {
 	client := cb.NewDeviceClientWithAddrs(config.BrokerConfig.PlatformURL,
 		config.BrokerConfig.MessagingURL,
 		config.BrokerConfig.SystemKey,
@@ -274,8 +265,6 @@ func authenticateOtherCbDevice() *cb.DeviceClient {
 	// Set Auth username password for standard mqtt auth
 	config.BrokerConfig.Username = client.DeviceToken
 	config.BrokerConfig.Password = config.BrokerConfig.SystemKey
-
-	return client
 }
 
 func setAdapterConfig(client cb.Client) {
