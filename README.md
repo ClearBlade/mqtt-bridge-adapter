@@ -55,7 +55,7 @@ An adapter_settings object is required for this adapter to function. See below f
 |systemKey (required if `isCbBroker`=true) | SystemKey of the ClearBlade System which user is connecting to |
 | systemSecret  (required if `isCbBroker`=true) | SystemSecret of the ClearBlade System which user is connecting to |
 | deviceName  (required if `isCbBroker`=true) |DeviceName of the device client which subscribes to the external MQTT broker |
-| ActiveKey (required if `isCbBroker`=true)| ActiveKey of the device client which subscribes to the external MQTT broker |
+| activeKey (required if `isCbBroker`=true)| ActiveKey of the device client which subscribes to the external MQTT broker |
 
 Here is an example adapter_settings object where the external MQTT broker is running on the same gateway as the adapter, on port 1883, does not require any authentication, and we want to subscribe to only the `lora/+/up` topic:
 
