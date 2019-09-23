@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"flag"
 	"log"
@@ -29,6 +30,10 @@ var (
 	config              adapterConfig
 	cbClient            *cb.DeviceClient
 	cbSentMessages      SentMessages
+	cbCancelCtx         context.CancelFunc
+	otherCancelCtx      context.CancelFunc
+	cbCtx               context.Context
+	otherCtx            context.Context
 )
 
 const (
@@ -117,38 +122,9 @@ func main() {
 		config.BrokerConfig.Client, err = initOtherMQTT()
 	}
 
-	//create map that stores sent messages, need this because we have no control of topic structure on other MQTT broker,
-	// so we can't break messages out into incoming/outgoing topics like the clearblade side does
-	cbSentMessages = SentMessages{
-		Mutex:    &sync.Mutex{},
-		Messages: make(map[SentKey]int),
-	}
-
-	//on cb we subscribe to all outgoing topics prefaced with topic root
-	log.Println("[INFO] Subscribing to outgoing clearblade topic")
-	var cbSubChannel <-chan *mqttTypes.Publish
-	for cbSubChannel, err = cbClient.Subscribe(config.TopicRoot+"/outgoing/#", qos); err != nil; {
-	}
-	go cbMessageListener(cbSubChannel)
-
-	//on other mqtt we subscribe to the provided topics, or all topics if nothing is provided
-	if len(config.BrokerConfig.Topics) == 0 {
-		log.Println("[INFO] No topics provided, subscribing to all topics for other MQTT broker")
-		config.BrokerConfig.Client.Subscribe("#", qos, otherMessageHandler)
-	} else {
-		log.Printf("[INFO] Subscribing to remote topics: %+v\n", config.BrokerConfig.Topics)
-		for _, element := range config.BrokerConfig.Topics {
-			config.BrokerConfig.Client.Subscribe(element, qos, otherMessageHandler)
-		}
-	}
-
-	for {
-		log.Println("[INFO] Listening for messages..")
-		time.Sleep(time.Duration(time.Second * 60))
-	}
 }
 
-func cbMessageListener(onPubChannel <-chan *mqttTypes.Publish) {
+func cbMessageListener(ctx context.Context, onPubChannel <-chan *mqttTypes.Publish) {
 	for {
 		select {
 		case message, ok := <-onPubChannel:
@@ -165,6 +141,8 @@ func cbMessageListener(onPubChannel <-chan *mqttTypes.Publish) {
 					log.Printf("[DEBUG] cbMessageListener - Unexpected topic for message from ClearBlade Broker: %s\n", message.Topic.Whole)
 				}
 			}
+		case <-ctx.Done():
+			return
 		}
 	}
 }
@@ -313,14 +291,49 @@ func setAdapterConfig(client cb.Client) {
 
 func onCBConnect(client mqtt.Client) {
 	log.Println("[DEBUG] onCBConnect - ClearBlade MQTT connected")
+
+	// subscribe
+	//on cb we subscribe to all outgoing topics prefaced with topic root
+	var err error
+	log.Println("[INFO] Subscribing to outgoing clearblade topic")
+	var cbSubChannel <-chan *mqttTypes.Publish
+	for cbSubChannel, err = cbClient.Subscribe(config.TopicRoot+"/outgoing/#", qos); err != nil; {
+	}
+
+	// listen
+	cbCtx, cbCancelCtx = context.WithCancel(context.Background())
+	go cbMessageListener(cbCtx, cbSubChannel)
 }
 
 func onCBDisconnect(client mqtt.Client, err error) {
 	log.Printf("[DEBUG] onCBDisonnect - ClearBlade MQTT disconnected: %s", err.Error())
+	cbCancelCtx()
 }
 
 func onOtherConnect(client mqtt.Client) {
 	log.Println("[DEBUG] onOtherConnect - Other MQTT connected")
+	//create map that stores sent messages, need this because we have no control of topic structure on other MQTT broker,
+	// so we can't break messages out into incoming/outgoing topics like the clearblade side does
+	cbSentMessages = SentMessages{
+		Mutex:    &sync.Mutex{},
+		Messages: make(map[SentKey]int),
+	}
+
+	//on other mqtt we subscribe to the provided topics, or all topics if nothing is provided
+	if len(config.BrokerConfig.Topics) == 0 {
+		log.Println("[INFO] No topics provided, subscribing to all topics for other MQTT broker")
+		config.BrokerConfig.Client.Subscribe("#", qos, otherMessageHandler)
+	} else {
+		log.Printf("[INFO] Subscribing to remote topics: %+v\n", config.BrokerConfig.Topics)
+		for _, element := range config.BrokerConfig.Topics {
+			config.BrokerConfig.Client.Subscribe(element, qos, otherMessageHandler)
+		}
+	}
+
+	// for {
+	// 	log.Println("[INFO] Listening for messages..")
+	// 	time.Sleep(time.Duration(time.Second * 60))
+	// }
 }
 
 func onOtherDisconnect(client mqtt.Client, err error) {
