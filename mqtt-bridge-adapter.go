@@ -225,6 +225,7 @@ func initOtherMQTT() (mqtt.Client, error) {
 	opts.SetCleanSession(false)
 
 	client := mqtt.NewClient(opts)
+
 	if token := client.Connect(); token.Wait() && token.Error() != nil {
 		log.Printf("[ERROR] initOtherMQTT - Unable to connect to other MQTT Broker: %s", token.Error())
 		return nil, token.Error()
@@ -326,13 +327,14 @@ func onOtherConnect(client mqtt.Client) {
 	//on other mqtt we subscribe to the provided topics, or all topics if nothing is provided
 	if len(config.BrokerConfig.Topics) == 0 {
 		log.Println("[INFO] No topics provided, subscribing to all topics for other MQTT broker")
-		config.BrokerConfig.Client.Subscribe("#", qos, otherMessageHandler)
+		client.Subscribe("#", qos, otherMessageHandler)
 	} else {
 		log.Printf("[INFO] Subscribing to remote topics: %+v\n", config.BrokerConfig.Topics)
 		for _, element := range config.BrokerConfig.Topics {
-			config.BrokerConfig.Client.Subscribe(element, qos, otherMessageHandler)
+			client.Subscribe(element, qos, otherMessageHandler)
 		}
 	}
+
 }
 
 func onOtherDisconnect(client mqtt.Client, err error) {
