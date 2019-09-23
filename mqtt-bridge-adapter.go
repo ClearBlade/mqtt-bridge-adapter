@@ -122,6 +122,11 @@ func main() {
 		config.BrokerConfig.Client, err = initOtherMQTT()
 	}
 
+	for {
+		time.Sleep(time.Duration(time.Second * 60))
+		log.Println("[INFO] Listening for messages..")
+	}
+
 }
 
 func cbMessageListener(ctx context.Context, onPubChannel <-chan *mqttTypes.Publish) {
@@ -299,7 +304,6 @@ func onCBConnect(client mqtt.Client) {
 	var cbSubChannel <-chan *mqttTypes.Publish
 	for cbSubChannel, err = cbClient.Subscribe(config.TopicRoot+"/outgoing/#", qos); err != nil; {
 	}
-
 	// listen
 	cbCtx, cbCancelCtx = context.WithCancel(context.Background())
 	go cbMessageListener(cbCtx, cbSubChannel)
@@ -329,11 +333,6 @@ func onOtherConnect(client mqtt.Client) {
 			config.BrokerConfig.Client.Subscribe(element, qos, otherMessageHandler)
 		}
 	}
-
-	// for {
-	// 	log.Println("[INFO] Listening for messages..")
-	// 	time.Sleep(time.Duration(time.Second * 60))
-	// }
 }
 
 func onOtherDisconnect(client mqtt.Client, err error) {
