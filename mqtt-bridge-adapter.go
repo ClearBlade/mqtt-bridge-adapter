@@ -123,10 +123,10 @@ func main() {
 	initCbClient()
 	var err error
 
-	for config.BrokerConfig.Client, err = initOtherMQTT(); err != nil; {
+	for err = initOtherMQTT(); err != nil; {
 		log.Println("[ERROR] Failed to initialize other MQTT client, trying again in 1 minute")
 		time.Sleep(time.Duration(time.Minute * 1))
-		config.BrokerConfig.Client, err = initOtherMQTT()
+		err = initOtherMQTT()
 	}
 
 	// for {
@@ -209,12 +209,12 @@ func initCbClient() {
 	}
 }
 
-func initOtherMQTT() (mqtt.Client, error) {
+func initOtherMQTT() error {
 	log.Println("[INFO] initOtherMQTT - Initializing Other MQTT")
 
 	if config.BrokerConfig.IsCbBroker {
 		if err := initOtherCbClient(); err != nil {
-			return nil, err
+			return err
 		}
 	}
 
@@ -240,10 +240,10 @@ func initOtherMQTT() (mqtt.Client, error) {
 
 	if token := client.Connect(); token.Wait() && token.Error() != nil {
 		log.Printf("[ERROR] initOtherMQTT - Unable to connect to other MQTT Broker: %s", token.Error())
-		return nil, token.Error()
+		return token.Error()
 	}
 	log.Println("[INFO] initOtherMQTT - Other MQTT Connected")
-	return client, nil
+	return nil
 }
 
 func initOtherCbClient() error {
@@ -334,7 +334,8 @@ func onCBDisconnect(client mqtt.Client, err error) {
 
 func onOtherConnect(client mqtt.Client) {
 	log.Println("[DEBUG] onOtherConnect - Other MQTT connected")
-
+	// Reset the OtherBroker Client on Reconnect
+	config.BrokerConfig.Client = client
 	//on other mqtt we subscribe to the provided topics, or all topics if nothing is provided
 	if len(config.BrokerConfig.Topics) == 0 {
 		log.Println("[INFO] No topics provided, subscribing to all topics for other MQTT broker")
