@@ -111,9 +111,14 @@ func main() {
 	}
 
 	log.SetOutput(filter)
+	//create map that stores sent messages, need this because we have no control of topic structure on other MQTT broker,
+	// so we can't break messages out into incoming/outgoing topics like the clearblade side does
+	cbSentMessages = SentMessages{
+		Mutex:    &sync.Mutex{},
+		Messages: make(map[SentKey]int),
+	}
 
 	initCbClient()
-
 	var err error
 
 	for config.BrokerConfig.Client, err = initOtherMQTT(); err != nil; {
@@ -318,12 +323,6 @@ func onCBDisconnect(client mqtt.Client, err error) {
 
 func onOtherConnect(client mqtt.Client) {
 	log.Println("[DEBUG] onOtherConnect - Other MQTT connected")
-	//create map that stores sent messages, need this because we have no control of topic structure on other MQTT broker,
-	// so we can't break messages out into incoming/outgoing topics like the clearblade side does
-	cbSentMessages = SentMessages{
-		Mutex:    &sync.Mutex{},
-		Messages: make(map[SentKey]int),
-	}
 
 	//on other mqtt we subscribe to the provided topics, or all topics if nothing is provided
 	if len(config.BrokerConfig.Topics) == 0 {
