@@ -155,6 +155,7 @@ func cbMessageListener(ctx context.Context, onPubChannel <-chan *mqttTypes.Publi
 				}
 			}
 		case <-ctx.Done():
+			log.Println("[DEBUG] Cancelling context..")
 			return
 		}
 	}
