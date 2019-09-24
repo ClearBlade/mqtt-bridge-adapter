@@ -314,11 +314,12 @@ func onCBConnect(client mqtt.Client) {
 	// 	time.Sleep(time.Duration(time.Second * 10))
 	// }
 	// listen
+	log.Println("Topic root: " + config.TopicRoot + "/outgoing/#")
+	for cbSubChannel, err = cbClient.Subscribe(config.TopicRoot+"/outgoing/#", qos); err != nil; {
+	}
 	cbCtx, cbCancelCtx = context.WithCancel(context.Background())
 	go cbMessageListener(cbCtx, cbSubChannel)
 
-	for cbSubChannel, err = cbClient.Subscribe(config.TopicRoot+"/outgoing/#", qos); err != nil; {
-	}
 }
 
 func onCBDisconnect(client mqtt.Client, err error) {
