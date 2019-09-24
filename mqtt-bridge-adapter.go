@@ -94,8 +94,10 @@ func validateFlags() {
 	}
 }
 
+var BuildId string = "unset"
+
 func main() {
-	log.Println("Starting mqttBridgeAdapter...")
+	log.Printf("Starting mqttBridgeAdapter... BuildId: %s", BuildId)
 
 	flag.Usage = usage
 	validateFlags()
