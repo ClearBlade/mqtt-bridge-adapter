@@ -149,7 +149,11 @@ func cbMessageListener(ctx context.Context, onPubChannel <-chan *mqttTypes.Publi
 					cbSentMessages.Mutex.Lock()
 					cbSentMessages.Messages[SentKey{topicToUse, string(message.Payload)}]++
 					cbSentMessages.Mutex.Unlock()
-					config.BrokerConfig.Client.Publish(topicToUse, qos, false, message.Payload)
+					if config.BrokerConfig.Client != nil && config.BrokerConfig.Client.IsConnected() {
+						config.BrokerConfig.Client.Publish(topicToUse, qos, false, message.Payload)
+					} else {
+						log.Println("Other Broker is not yet connected..")
+					}
 				} else {
 					log.Printf("[DEBUG] cbMessageListener - Unexpected topic for message from ClearBlade Broker: %s\n", message.Topic.Whole)
 				}
