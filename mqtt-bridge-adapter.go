@@ -112,7 +112,7 @@ func main() {
 
 	log.SetOutput(filter)
 
-	cbClient = initCbClient()
+	initCbClient()
 
 	var err error
 
@@ -174,27 +174,25 @@ func otherMessageHandler(client mqtt.Client, msg mqtt.Message) {
 	}
 }
 
-func initCbClient() *cb.DeviceClient {
-	client := cb.NewDeviceClientWithAddrs(platformURL, messagingURL, sysKey, sysSec, deviceName, activeKey)
+func initCbClient() {
+	cbClient = cb.NewDeviceClientWithAddrs(platformURL, messagingURL, sysKey, sysSec, deviceName, activeKey)
 
 	log.Println("[INFO] initCbClient - Authenticating with ClearBlade")
-	for err := client.Authenticate(); err != nil; {
+	for err := cbClient.Authenticate(); err != nil; {
 		log.Printf("[ERROR] initCbClient - Error authenticating ClearBlade: %s\n", err.Error())
 		log.Println("[ERROR] initCbClient - Will retry in 1 minute...")
 		time.Sleep(time.Duration(time.Minute * 1))
-		err = client.Authenticate()
+		err = cbClient.Authenticate()
 	}
 
 	log.Println("[INFO] initCbClient - Fetching adapter config")
-	setAdapterConfig(client)
+	setAdapterConfig(cbClient)
 
 	log.Println("[INFO] initCbClient - Initializing ClearBlade MQTT")
 	callbacks := cb.Callbacks{OnConnectCallback: onCBConnect, OnConnectionLostCallback: onCBDisconnect}
-	if err := client.InitializeMQTTWithCallback(deviceName+"-"+strconv.Itoa(randomInt(0, 10000)), "", 30, nil, nil, &callbacks); err != nil {
+	if err := cbClient.InitializeMQTTWithCallback(deviceName+"-"+strconv.Itoa(randomInt(0, 10000)), "", 30, nil, nil, &callbacks); err != nil {
 		log.Fatalf("[FATAL] initCbClient - Unable to initialize MQTT connection with ClearBlade: %s", err.Error())
 	}
-
-	return client
 }
 
 func initOtherMQTT() (mqtt.Client, error) {
@@ -303,6 +301,9 @@ func onCBConnect(client mqtt.Client) {
 	var err error
 	log.Println("[INFO] Subscribing to outgoing clearblade topic")
 	var cbSubChannel <-chan *mqttTypes.Publish
+	// for cbClient == nil {
+	// 	time.Sleep(time.Duration(time.Second * 10))
+	// }
 	for cbSubChannel, err = cbClient.Subscribe(config.TopicRoot+"/outgoing/#", qos); err != nil; {
 	}
 	// listen
