@@ -145,6 +145,7 @@ func cbMessageListener(ctx context.Context, onPubChannel <-chan *mqttTypes.Publi
 				if len(message.Topic.Split) >= 3 {
 					log.Printf("[DEBUG] cbMessageListener - message received topic: %s message: %s\n", message.Topic.Whole, string(message.Payload))
 					topicToUse := strings.Join(message.Topic.Split[2:], "/")
+					log.Printf("[DEBUG] cbSentMessages: %+v\n", cbSentMessages)
 					cbSentMessages.Mutex.Lock()
 					cbSentMessages.Messages[SentKey{topicToUse, string(message.Payload)}]++
 					cbSentMessages.Mutex.Unlock()
