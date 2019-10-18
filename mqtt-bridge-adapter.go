@@ -234,7 +234,7 @@ func initOtherMQTT() error {
 	opts.SetOnConnectHandler(onOtherConnect)
 	opts.SetConnectionLostHandler(onOtherDisconnect)
 	opts.SetAutoReconnect(true)
-	opts.SetCleanSession(false)
+	opts.SetCleanSession(true)
 
 	client := mqtt.NewClient(opts)
 
