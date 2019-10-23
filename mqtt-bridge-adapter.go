@@ -124,8 +124,8 @@ func main() {
 	var err error
 
 	for err = initOtherMQTT(); err != nil; {
-		log.Println("[ERROR] Failed to initialize other MQTT client, trying again in 1 minute")
-		time.Sleep(time.Duration(time.Minute * 1))
+		log.Println("[ERROR] Failed to initialize other MQTT client, trying again in 20 seconds")
+		time.Sleep(time.Duration(time.Second * 20))
 		err = initOtherMQTT()
 	}
 
@@ -194,8 +194,8 @@ func initCbClient() {
 	log.Println("[INFO] initCbClient - Authenticating with ClearBlade")
 	for err := cbClient.Authenticate(); err != nil; {
 		log.Printf("[ERROR] initCbClient - Error authenticating ClearBlade: %s\n", err.Error())
-		log.Println("[ERROR] initCbClient - Will retry in 1 minute...")
-		time.Sleep(time.Duration(time.Minute * 1))
+		log.Println("[ERROR] initCbClient - Will retry in 20 seconds...")
+		time.Sleep(time.Duration(time.Second * 20))
 		err = cbClient.Authenticate()
 	}
 
@@ -235,6 +235,12 @@ func initOtherMQTT() error {
 	opts.SetConnectionLostHandler(onOtherDisconnect)
 	opts.SetAutoReconnect(true)
 	opts.SetCleanSession(true)
+	opts.SetKeepAlive(5 * time.Second)
+	opts.SetPingTimeout(5 * time.Second)
+	opts.SetConnectTimeout(12 * time.Second)
+	opts.SetMaxReconnectInterval(25 * time.Second)
+	log.Println("Options before creating client:")
+	log.Println(opts)
 
 	client := mqtt.NewClient(opts)
 
