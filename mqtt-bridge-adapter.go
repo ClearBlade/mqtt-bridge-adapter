@@ -122,8 +122,13 @@ func main() {
 		Messages: make(map[SentKey]int),
 	}
 
-	initCbClient()
 	var err error
+
+	for err = initCbClient(); err != nil; {
+		log.Println("[ERROR] Failed to initialize Parent MQTT client, trying again in 20 seconds")
+		time.Sleep(time.Duration(time.Second * 20))
+		err = initCbClient()
+	}
 
 	for err = initOtherMQTT(); err != nil; {
 		log.Println("[ERROR] Failed to initialize other MQTT client, trying again in 20 seconds")
@@ -131,10 +136,6 @@ func main() {
 		err = initOtherMQTT()
 	}
 
-	// for {
-	// 	time.Sleep(time.Duration(time.Second * 60))
-	// 	log.Println("[INFO] Listening for messages..")
-	// }
 	c := make(chan struct{})
 	<-c
 }
@@ -185,8 +186,9 @@ func otherMessageHandler(client mqtt.Client, msg mqtt.Message) {
 	cbSentMessages.Mutex.Unlock()
 	log.Printf("[DEBUG] otherMessageHandler - message received topic: %s message: %s\n", msg.Topic(), string(msg.Payload()))
 	topicToUse := config.TopicRoot + "/incoming/" + msg.Topic()
-	if err := cbClient.Publish(topicToUse, msg.Payload(), qos); err != nil {
-		log.Printf("[ERROR] otherMessageHandler - failed to forward message to ClearBlade: %s\n", err.Error())
+
+	if token := cbMqttClient.Publish(topicToUse, qos, false, msg.Payload()); token.Error() != nil {
+		log.Printf("[ERROR] otherMessageHandler - failed to forward message to ClearBlade: %s\n", token.Error())
 	}
 }
 
@@ -196,15 +198,14 @@ func initCbClient() error {
 	log.Println("[INFO] initCbClient - Authenticating with ClearBlade")
 	for err := cbClient.Authenticate(); err != nil; {
 		log.Printf("[ERROR] initCbClient - Error authenticating ClearBlade: %s\n", err.Error())
-		log.Println("[ERROR] initCbClient - Will retry in 20 seconds...")
-		time.Sleep(time.Duration(time.Second * 20))
+		time.Sleep(time.Duration(time.Second * 1)) //TODO 10 to 1
 		err = cbClient.Authenticate()
 	}
 
 	log.Println("[INFO] initCbClient - Fetching adapter config")
 	setAdapterConfig(cbClient)
 
-	log.Println("[INFO] Init Connection to Parent Edge")
+	log.Println("[INFO] initCbClient - Init Connection to Parent Edge")
 
 	opts := mqtt.NewClientOptions()
 
@@ -220,20 +221,20 @@ func initCbClient() error {
 	opts.SetConnectionLostHandler(onCBDisconnect)
 	opts.SetAutoReconnect(false)
 	opts.SetCleanSession(true)
-	opts.SetKeepAlive(5 * time.Second)
-	opts.SetPingTimeout(5 * time.Second)
-	opts.SetConnectTimeout(12 * time.Second)
-	opts.SetMaxReconnectInterval(25 * time.Second)
-	log.Println("Options before creating client:")
-	log.Println(opts)
+	opts.SetKeepAlive(3 * time.Second)
+	opts.SetPingTimeout(3 * time.Second)
+	opts.SetConnectTimeout(4 * time.Second)
+	//opts.SetMaxReconnectInterval(25 * time.Second)
+	//log.Println("Options before creating client:")
+	//log.Println(opts)
 
-	cbMqttClient := mqtt.NewClient(opts)
+	cbMqttClient = mqtt.NewClient(opts)
 
 	if token := cbMqttClient.Connect(); token.Wait() && token.Error() != nil {
-		log.Printf("[ERROR] initOtherMQTT - Unable to connect to other MQTT Broker: %s", token.Error())
+		log.Printf("[ERROR] initCbClient - Unable to connect to other MQTT Broker: %s", token.Error())
 		return token.Error()
 	}
-	log.Println("[INFO] initOtherMQTT - Other MQTT Connected")
+	log.Println("[INFO] initCbClient - Parent Edge MQTT Connected")
 
 	// callbacks := cb.Callbacks{OnConnectCallback: onCBConnect, OnConnectionLostCallback: onCBDisconnect}
 	// if err := cbClient.InitializeMQTTWithCallback(deviceName+"-"+strconv.Itoa(randomInt(0, 10000)), "", 30, nil, nil, &callbacks); err != nil {
@@ -269,12 +270,12 @@ func initOtherMQTT() error {
 	opts.SetConnectionLostHandler(onOtherDisconnect)
 	opts.SetAutoReconnect(false)
 	opts.SetCleanSession(true)
-	opts.SetKeepAlive(5 * time.Second)
-	opts.SetPingTimeout(5 * time.Second)
-	opts.SetConnectTimeout(12 * time.Second)
-	opts.SetMaxReconnectInterval(25 * time.Second)
-	log.Println("Options before creating client:")
-	log.Println(opts)
+	opts.SetKeepAlive(3 * time.Second)
+	opts.SetPingTimeout(3 * time.Second)
+	opts.SetConnectTimeout(4 * time.Second)
+	//opts.SetMaxReconnectInterval(25 * time.Second)
+	//log.Println("Options before creating client:")
+	//log.Println(opts)
 
 	client := mqtt.NewClient(opts)
 
@@ -301,7 +302,7 @@ func initOtherCbClient() error {
 	}
 	// Set Auth username password for standard mqtt auth
 	config.BrokerConfig.Username = client.DeviceToken
-	config.BrokerConfig.Password = config.BrokerConfig.SystemKey
+	config.BrokerConfig.Password = client.SystemKey
 	return nil
 }
 
@@ -377,7 +378,12 @@ func onCBConnect(client mqtt.Client) {
 func onCBDisconnect(client mqtt.Client, err error) {
 	log.Printf("[DEBUG] onCBDisonnect - ClearBlade MQTT disconnected: %s", err.Error())
 	cbCancelCtx()
-	initCbClient()
+
+	for errInit := initCbClient(); errInit != nil; {
+		log.Println("[ERROR] Failed to initialize Parent MQTT client, trying again in 20 seconds")
+		time.Sleep(time.Duration(time.Second * 1))
+		errInit = initCbClient()
+	}
 }
 
 func onOtherConnect(client mqtt.Client) {
@@ -400,7 +406,11 @@ func onOtherConnect(client mqtt.Client) {
 func onOtherDisconnect(client mqtt.Client, err error) {
 	log.Printf("[DEBUG] onOtherConnect - Other MQTT disconnected: %s", err.Error())
 
-	initOtherMQTT()
+	for err = initOtherMQTT(); err != nil; {
+		log.Println("[ERROR] Failed to initialize other MQTT client, trying again in 20 seconds")
+		time.Sleep(time.Duration(time.Second * 1))
+		err = initOtherMQTT()
+	}
 }
 
 func randomInt(min, max int) int {
