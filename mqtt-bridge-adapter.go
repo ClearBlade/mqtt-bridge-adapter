@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"flag"
+	"fmt"
 	"log"
 	"math/rand"
 	"os"
@@ -29,6 +30,7 @@ var (
 	adapterConfigCollID string
 	config              adapterConfig
 	cbClient            *cb.DeviceClient
+	cbMqttClient        mqtt.Client
 	cbSentMessages      SentMessages
 	cbCancelCtx         context.CancelFunc
 	otherCancelCtx      context.CancelFunc
@@ -188,7 +190,7 @@ func otherMessageHandler(client mqtt.Client, msg mqtt.Message) {
 	}
 }
 
-func initCbClient() {
+func initCbClient() error {
 	cbClient = cb.NewDeviceClientWithAddrs(platformURL, messagingURL, sysKey, sysSec, deviceName, activeKey)
 
 	log.Println("[INFO] initCbClient - Authenticating with ClearBlade")
@@ -202,11 +204,43 @@ func initCbClient() {
 	log.Println("[INFO] initCbClient - Fetching adapter config")
 	setAdapterConfig(cbClient)
 
-	log.Println("[INFO] initCbClient - Initializing ClearBlade MQTT")
-	callbacks := cb.Callbacks{OnConnectCallback: onCBConnect, OnConnectionLostCallback: onCBDisconnect}
-	if err := cbClient.InitializeMQTTWithCallback(deviceName+"-"+strconv.Itoa(randomInt(0, 10000)), "", 30, nil, nil, &callbacks); err != nil {
-		log.Fatalf("[FATAL] initCbClient - Unable to initialize MQTT connection with ClearBlade: %s", err.Error())
+	log.Println("[INFO] Init Connection to Parent Edge")
+
+	opts := mqtt.NewClientOptions()
+
+	opts.AddBroker(messagingURL)
+
+	if cbClient.DeviceToken == "" || cbClient.SystemKey == "" {
+		return fmt.Errorf("[ERROR] initCbClient - DeviceToken or SystemKey not set")
 	}
+	opts.SetUsername(cbClient.DeviceToken)
+	opts.SetPassword(cbClient.SystemKey)
+	opts.SetClientID(deviceName + "-" + strconv.Itoa(randomInt(0, 10000)))
+	opts.SetOnConnectHandler(onCBConnect)
+	opts.SetConnectionLostHandler(onCBDisconnect)
+	opts.SetAutoReconnect(false)
+	opts.SetCleanSession(true)
+	opts.SetKeepAlive(5 * time.Second)
+	opts.SetPingTimeout(5 * time.Second)
+	opts.SetConnectTimeout(12 * time.Second)
+	opts.SetMaxReconnectInterval(25 * time.Second)
+	log.Println("Options before creating client:")
+	log.Println(opts)
+
+	cbMqttClient := mqtt.NewClient(opts)
+
+	if token := cbMqttClient.Connect(); token.Wait() && token.Error() != nil {
+		log.Printf("[ERROR] initOtherMQTT - Unable to connect to other MQTT Broker: %s", token.Error())
+		return token.Error()
+	}
+	log.Println("[INFO] initOtherMQTT - Other MQTT Connected")
+
+	// callbacks := cb.Callbacks{OnConnectCallback: onCBConnect, OnConnectionLostCallback: onCBDisconnect}
+	// if err := cbClient.InitializeMQTTWithCallback(deviceName+"-"+strconv.Itoa(randomInt(0, 10000)), "", 30, nil, nil, &callbacks); err != nil {
+	// 	log.Fatalf("[FATAL] initCbClient - Unable to initialize MQTT connection with ClearBlade: %s", err.Error())
+	// }
+	return nil
+
 }
 
 func initOtherMQTT() error {
@@ -233,7 +267,7 @@ func initOtherMQTT() error {
 	opts.SetClientID(deviceName + "-" + strconv.Itoa(randomInt(0, 10000)))
 	opts.SetOnConnectHandler(onOtherConnect)
 	opts.SetConnectionLostHandler(onOtherDisconnect)
-	opts.SetAutoReconnect(true)
+	opts.SetAutoReconnect(false)
 	opts.SetCleanSession(true)
 	opts.SetKeepAlive(5 * time.Second)
 	opts.SetPingTimeout(5 * time.Second)
@@ -318,16 +352,23 @@ func onCBConnect(client mqtt.Client) {
 
 	// subscribe
 	//on cb we subscribe to all outgoing topics prefaced with topic root
-	var err error
 	log.Println("[INFO] Subscribing to outgoing clearblade topic")
-	var cbSubChannel <-chan *mqttTypes.Publish
-	// for cbClient == nil {
-	// 	time.Sleep(time.Duration(time.Second * 10))
-	// }
-	// listen
-	log.Println("Topic root: " + config.TopicRoot + "/outgoing/#")
-	for cbSubChannel, err = cbClient.Subscribe(config.TopicRoot+"/outgoing/#", qos); err != nil; {
+	outgoingTopic := config.TopicRoot + "/outgoing/#"
+	log.Println("Topic root: " + outgoingTopic)
+
+	cbSubChannel := make(chan *mqttTypes.Publish, 50)
+
+	ret := client.Subscribe(outgoingTopic, uint8(qos), func(c mqtt.Client, msg mqtt.Message) {
+		path, _ := mqttTypes.NewTopicPath(msg.Topic())
+		cbSubChannel <- &mqttTypes.Publish{Topic: path, Payload: msg.Payload()}
+	})
+
+	ret.WaitTimeout(1 * time.Second)
+	if ret.Error() != nil {
+		log.Printf("[DEBUG] onCBConnect - Subscribe error %s\n", ret.Error())
+		return
 	}
+
 	cbCtx, cbCancelCtx = context.WithCancel(context.Background())
 	go cbMessageListener(cbCtx, cbSubChannel)
 
@@ -336,6 +377,7 @@ func onCBConnect(client mqtt.Client) {
 func onCBDisconnect(client mqtt.Client, err error) {
 	log.Printf("[DEBUG] onCBDisonnect - ClearBlade MQTT disconnected: %s", err.Error())
 	cbCancelCtx()
+	initCbClient()
 }
 
 func onOtherConnect(client mqtt.Client) {
@@ -357,6 +399,8 @@ func onOtherConnect(client mqtt.Client) {
 
 func onOtherDisconnect(client mqtt.Client, err error) {
 	log.Printf("[DEBUG] onOtherConnect - Other MQTT disconnected: %s", err.Error())
+
+	initOtherMQTT()
 }
 
 func randomInt(min, max int) int {

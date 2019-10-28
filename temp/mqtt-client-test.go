@@ -163,7 +163,7 @@ func initOtherMQTT() error {
 	opts.SetClientID(deviceName + "-" + "123")
 	opts.SetOnConnectHandler(onOtherConnect)
 	opts.SetConnectionLostHandler(onOtherDisconnect)
-	opts.SetAutoReconnect(true)
+	opts.SetAutoReconnect(false)
 	opts.SetCleanSession(true)
 	opts.SetKeepAlive(3 * time.Second)
 	opts.SetPingTimeout(3 * time.Second)
