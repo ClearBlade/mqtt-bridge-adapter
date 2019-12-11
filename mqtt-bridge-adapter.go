@@ -221,9 +221,9 @@ func initCbClient() error {
 	opts.SetConnectionLostHandler(onCBDisconnect)
 	opts.SetAutoReconnect(false)
 	opts.SetCleanSession(true)
-	opts.SetKeepAlive(3 * time.Second)
-	opts.SetPingTimeout(3 * time.Second)
-	opts.SetConnectTimeout(4 * time.Second)
+	opts.SetKeepAlive(10 * time.Second)
+	opts.SetPingTimeout(10 * time.Second)
+	opts.SetConnectTimeout(8 * time.Second)
 	//opts.SetMaxReconnectInterval(25 * time.Second)
 	//log.Println("Options before creating client:")
 	//log.Println(opts)
@@ -270,9 +270,9 @@ func initOtherMQTT() error {
 	opts.SetConnectionLostHandler(onOtherDisconnect)
 	opts.SetAutoReconnect(false)
 	opts.SetCleanSession(true)
-	opts.SetKeepAlive(3 * time.Second)
-	opts.SetPingTimeout(3 * time.Second)
-	opts.SetConnectTimeout(4 * time.Second)
+	opts.SetKeepAlive(10 * time.Second)
+	opts.SetPingTimeout(10 * time.Second)
+	opts.SetConnectTimeout(8 * time.Second)
 	//opts.SetMaxReconnectInterval(25 * time.Second)
 	//log.Println("Options before creating client:")
 	//log.Println(opts)
@@ -296,6 +296,11 @@ func initOtherCbClient() error {
 		config.BrokerConfig.ActiveKey)
 
 	log.Println("[INFO] initOtherCbClient - Authenticating with ClearBlade")
+
+	if config.BrokerConfig.Username != "" && config.BrokerConfig.Password != "" {
+		return nil
+	}
+
 	if err := client.Authenticate(); err != nil {
 		log.Printf("[ERROR] initOtherCbClient - Error authenticating ClearBlade: %s\n", err.Error())
 		return err
@@ -380,7 +385,7 @@ func onCBDisconnect(client mqtt.Client, err error) {
 	cbCancelCtx()
 
 	for errInit := initCbClient(); errInit != nil; {
-		log.Println("[ERROR] Failed to initialize Parent MQTT client, trying again in 20 seconds")
+		log.Println("[ERROR] Failed to initialize Parent MQTT client, trying again every 1 second until successful")
 		time.Sleep(time.Duration(time.Second * 1))
 		errInit = initCbClient()
 	}
@@ -407,7 +412,7 @@ func onOtherDisconnect(client mqtt.Client, err error) {
 	log.Printf("[DEBUG] onOtherConnect - Other MQTT disconnected: %s", err.Error())
 
 	for err = initOtherMQTT(); err != nil; {
-		log.Println("[ERROR] Failed to initialize other MQTT client, trying again in 20 seconds")
+		log.Println("[ERROR] Failed to initialize other MQTT client, trying again in 1 seconds")
 		time.Sleep(time.Duration(time.Second * 1))
 		err = initOtherMQTT()
 	}
