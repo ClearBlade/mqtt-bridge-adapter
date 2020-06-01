@@ -196,10 +196,10 @@ func initCbClient() error {
 	cbClient = cb.NewDeviceClientWithAddrs(platformURL, messagingURL, sysKey, sysSec, deviceName, activeKey)
 
 	log.Println("[INFO] initCbClient - Authenticating with ClearBlade")
-	for err := cbClient.Authenticate(); err != nil; {
+	for _, err := cbClient.Authenticate(); err != nil; {
 		log.Printf("[ERROR] initCbClient - Error authenticating ClearBlade: %s\n", err.Error())
 		time.Sleep(time.Duration(time.Second * 1)) //TODO 10 to 1
-		err = cbClient.Authenticate()
+		_, err = cbClient.Authenticate()
 	}
 
 	log.Println("[INFO] initCbClient - Fetching adapter config")
@@ -301,7 +301,7 @@ func initOtherCbClient() error {
 		return nil
 	}
 
-	if err := client.Authenticate(); err != nil {
+	if _, err := client.Authenticate(); err != nil {
 		log.Printf("[ERROR] initOtherCbClient - Error authenticating ClearBlade: %s\n", err.Error())
 		return err
 	}
