@@ -50,6 +50,12 @@ An adapter_settings object is required for this adapter to function. See below f
 | username (_optional_) | Username to use when connecting to external MQTT broker, can be ommited if no username is required |
 | password (_optional_) | Password to use when connecting to external MQTT broker, can be ommited if no password is required |
 | topics (__required__) | An array of strings that the adapter should subscribe to on the external MQTT broker |
+| isCbBroker (default=false) | Let's the adapter know if the Broker to connect to is a ClearBlade Broker or not|
+|platformURL (required if `isCbBroker`=true) | URL of the ClearBlade Platform to Authenticate with|
+|systemKey (required if `isCbBroker`=true) | SystemKey of the ClearBlade System which user is connecting to |
+| systemSecret  (required if `isCbBroker`=true) | SystemSecret of the ClearBlade System which user is connecting to |
+| deviceName  (required if `isCbBroker`=true) |DeviceName of the device client which subscribes to the external MQTT broker |
+| activeKey (required if `isCbBroker`=true)| ActiveKey of the device client which subscribes to the external MQTT broker |
 
 Here is an example adapter_settings object where the external MQTT broker is running on the same gateway as the adapter, on port 1883, does not require any authentication, and we want to subscribe to only the `lora/+/up` topic:
 
